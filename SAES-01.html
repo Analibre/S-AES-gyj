@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>test</title>
+</head>
+<body>
+<input type="text" class="myInput" id="Input" >
+<button  onclick="jiami()">加密</button>
+<br>
+<input type="text" class="myInput" id="Input2" >
+<button  onclick="jiemi()">解密</button>
+<script>
+    let plaintext = '0011110010101001';
+    let key       = '0010110101010101';
+    let ciphertext ='1101000100010110';
+    function jiami(){
+        let encryptresult =encrypt(plaintext, key);
+        var inputElement = document.getElementById("Input");
+        inputElement.value = encryptresult;
+    }
+    function jiemi(){
+        let decryptresult = decrypt(ciphertext, key);
+        var inputElement = document.getElementById("Input2");
+        inputElement.value = decryptresult;
+    }
+    // S盒和逆S盒
+    const S_BOX = [
+        0x9, 0x4, 0xA, 0xB, 0xD, 0x1, 0x8, 0x5,
+        0x6, 0x2, 0x0, 0x3, 0xC, 0xE, 0xF, 0x7
+    ];
+
+    const INV_S_BOX = [
+        0xA, 0x5, 0x9, 0xB, 0x1, 0x7, 0x8, 0xF,
+        0x6, 0x0, 0x2, 0x3, 0xC, 0x4, 0xD, 0xE
+    ];
+
+
+    // S盒替换
+    function subBytes(state, inverse = false) {
+        const box = inverse ? INV_S_BOX : S_BOX;
+        let newState = '';
+        for (let i = 0; i < state.length; i += 4) {
+            let row = state.substring(i, i + 2);
+            let col = state.substring(i + 2, i + 4);
+            let rowDec = parseInt(row, 2);
+            let colDec = parseInt(col, 2);
+            let index = (rowDec * 4) + colDec;
+            let binary = box[index].toString(2).padStart(4, '0');
+            newState += binary;
+        }
+        return newState;
+    }
+
+    // 行移位
+    function shiftRows(state) {
+
+        let part1 = state.substring(0, 8);  // 前8位
+        let part2 = state.substring(8, 12); // 8-11位
+        let part3 = state.substring(12, 16); // 12-15位
+
+        // 交换8-11位和12-15位
+        let State = part1 + part3 + part2;
+        return State;
+    }
+
+    function XOR(a, b) {
+        return a ^ b;
+    }
+    // 列混淆（简化版，使用固定矩阵）
+    // 列混淆
+    function MixColumns(bits) {
+        let result = XOR(bits.slice(0, 4), GF('0100', bits.slice(4, 8))) +
+            XOR(GF('0100', bits.slice(0, 4)), bits.slice(4, 8)) +
+            XOR(bits.slice(8, 12), GF('0100', bits.slice(12, 16))) +
+            XOR(GF('0100', bits.slice(8, 12)), bits.slice(12, 16));
+        result = result.toString(2).padStart(16, '0');
+        return result;
+    }
+
+    // 逆列混淆
+    function InvMixColumns(bits) {
+        let result = XOR(GF('1001', bits.slice(0, 4)), GF('0010', bits.slice(4, 8))) +
+            XOR(GF('0010', bits.slice(0, 4)), GF('1001', bits.slice(4, 8))) +
+            XOR(GF('1001', bits.slice(8, 12)), GF('0010', bits.slice(12, 16))) +
+            XOR(GF('0010', bits.slice(8, 12)), GF('1001', bits.slice(12, 16)));
+        result = result.toString(2).padStart(16, '0');
+        return result;
+    }
+
+    // GF(2^4)上的乘法
+    function GF(a, b) {
+        const mulTable = [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+            [0, 2, 4, 6, 8, 10, 12, 14, 3, 1, 7, 5, 11, 9, 15, 13],
+            [0, 3, 6, 5, 12, 15, 10, 9, 11, 8, 13, 14, 7, 4, 1, 2],
+            [0, 4, 8, 12, 3, 7, 11, 15, 6, 2, 14, 10, 5, 1, 13, 9],
+            [0, 5, 10, 15, 7, 2, 13, 8, 14, 11, 4, 1, 9, 12, 3, 6],
+            [0, 6, 12, 10, 11, 13, 7, 1, 5, 3, 9, 15, 14, 8, 2, 4],
+            [0, 7, 14, 9, 15, 8, 1, 6, 13, 10, 3, 4, 2, 5, 12, 11],
+            [0, 8, 3, 11, 6, 14, 5, 13, 12, 4, 15, 7, 10, 2, 9, 1],
+            [0, 9, 1, 8, 2, 11, 3, 10, 4, 13, 5, 12, 6, 15, 7, 14],
+            [0, 10, 7, 13, 14, 4, 9, 3, 15, 5, 8, 2, 1, 11, 6, 12],
+            [0, 11, 5, 14, 10, 1, 15, 4, 7, 12, 2, 9, 13, 6, 8, 3],
+            [0, 12, 11, 7, 5, 9, 14, 2, 10, 6, 1, 13, 15, 3, 4, 8],
+            [0, 13, 9, 4, 1, 12, 8, 5, 2, 15, 11, 6, 3, 14, 10, 7],
+            [0, 14, 15, 1, 13, 3, 2, 12, 9, 7, 6, 8, 4, 10, 11, 5],
+            [0, 15, 13, 2, 9, 6, 4, 11, 1, 14, 12, 3, 8, 7, 5, 10]
+        ];
+        const resultInt = mulTable[parseInt(a, 2)][parseInt(b, 2)];
+        return resultInt.toString(2).padStart(4, '0');
+    }
+
+
+    function xorWords(word1, word2) {
+        let intWord1 = parseInt(word1, 2);
+        let intWord2 = parseInt(word2, 2);
+        let result = intWord1 ^ intWord2;
+        result = result.toString(2);
+        return result;
+    }
+    function rotNib(key){
+        let w0 = key.substring(0,8);
+        let w1 = key.substring(8,16);
+        let tmp = w0;
+        w0 = w1;
+        w1 = tmp;
+        let subkey = w0+w1;
+        return subkey;
+    }
+    function expandKey(key) {
+        let w0 = key.substring(0,8);
+        let w1 = key.substring(8,16);
+        // 轮常数
+        const RCON = ['10000000', '00110000'];
+        let temp = xorWords(w0,RCON[0]);
+        let w2 = xorWords(temp,subBytes(rotNib(w1)));
+        let w3 = xorWords(w1,w2);
+        let roundKeys = w2 + w3;
+        return roundKeys;
+    }
+
+    // 密钥加
+    function addRoundKey(state, roundKey) {
+        let newState = '';
+        for (let i = 0; i < state.length; i++) {
+            newState += (state[i] ^ roundKey[i]).toString();
+        }
+        return newState;
+    }
+
+
+
+
+
+    // 加密函数
+    function encrypt(plaintext, key) {
+        let state = plaintext;
+        let roundkey0 = key;
+        let roundKey1 = expandKey(key);
+        let roundKey2 = expandKey(roundKey1);
+
+        let state_1 = addRoundKey(state, roundkey0);  //ok  0001000111111100
+        // subBytes(state) ：          0100010001111100 ok
+        //shiftRows(subBytes(state))  0100010011000111  ok
+        // mix ?? 只有这一个函数不确定结果对不对
+        let state_2 = addRoundKey(MixColumns(shiftRows(subBytes(state_1))), roundKey1);
+        let state_3 = addRoundKey(shiftRows(subBytes(state_2)), roundKey2);
+        return state_3;
+    }
+
+    // 解密函数
+    function decrypt(ciphertext, key) {
+        let state = ciphertext;
+        let roundkey0 = key;
+        let roundKey1 = expandKey(key);
+        let roundKey2 = expandKey(roundKey1);
+
+        // 初始轮
+        let state_1 = addRoundKey(state, roundKey2);
+
+        // 第一轮
+        let state_2 = InvMixColumns(addRoundKey(subBytes(shiftRows(state_1, true), true), roundKey1));
+
+        // 最终轮
+        let state_3 = addRoundKey(subBytes(shiftRows(state_2, true), true), roundKey1);
+
+        return state_3;
+    }
+
+    // 用于调试的辅助函数，将二进制字符串转换为十六进制表示
+    function binToHex(bin) {
+        return parseInt(bin, 2).toString(16).padStart(bin.length / 4, '0');
+    }
+
+
+   /* // 加密
+    let ciphertext = encrypt(plaintext, key);
+    console.log('Ciphertext (binary):', ciphertext);
+    console.log('Ciphertext (hex):', binToHex(ciphertext));
+
+    /!*!// 解密
+    let decryptedText = decrypt(ciphertext, key);
+    console.log('Decrypted text (binary):', decryptedText);
+    console.log('Decrypted text (hex):', binToHex(decryptedText));*!/*/
+</script>
+</body>
+</html>
